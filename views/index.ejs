@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Log Search for Dyte</title>
+    <style>
+      body {
+        font-family: 'Arial', sans-serif;
+        margin: 0;
+        padding: 20px;
+        background-color: #f8f9fa;
+      }
+
+      h1 {
+        color: #007bff;
+      }
+
+      form {
+        margin-bottom: 20px;
+      }
+
+      label {
+        margin-right: 10px;
+        font-weight: bold;
+        color: #495057;
+      }
+
+      textarea {
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 10px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+
+      input,
+      select {
+        margin-bottom: 10px;
+        padding: 8px;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+
+      button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background-color: #0056b3;
+      }
+
+      #ingestForm {
+        background-color: white;
+        padding: 20px;
+        border-radius: 5px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
+      }
+
+      #successMessage {
+        color: #28a745;
+        font-weight: bold;
+        margin-bottom: 10px;
+      }
+
+      #resultList {
+        list-style: none;
+        padding: 0;
+      }
+
+      #resultList li {
+        margin-bottom: 10px;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        background-color: white;
+      }
+
+      .loading {
+        color: #007bff;
+      }
+
+      .error {
+        color: #dc3545;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Log Search for Dyte</h1>
+
+    <label> <input type="checkbox" id="loginAsAdmin" /> Login as admin for role based access</label>
+
+    <div id="ingestForm">
+      <div id="successMessage"></div>
+      <form>
+        <label for="logData">Ingest Data:</label>
+        <textarea id="logData" name="logData" placeholder="Enter log data"></textarea>
+        <button type="button" onclick="ingestData()">Ingest Data</button>
+      </form>
+    </div>
+
+    <form id="filterForm">
+      <label for="level">Level:</label>
+      <select id="level" name="level">
+        <option value="">Select Level</option>
+        <option value="info">Info</option>
+        <option value="warning">Warning</option>
+        <option value="error">Error</option>
+      </select>
+
+      <label for="timestamp">Timestamp:</label>
+      <input type="text" id="timestamp" name="timestamp" placeholder="Enter Timestamp" />
+
+      <label for="resourceId">Resource ID:</label>
+      <input type="text" id="resourceId" name="resourceId" placeholder="Enter Resource ID" />
+
+      <label for="message">Message</label>
+      <input type="text" id="message" name="message" placeholder="Enter Message" />
+
+      <label for="traceId">Trace ID:</label>
+      <input type="text" id="traceId" name="traceId" placeholder="Enter Trace ID" />
+
+      <label for="spanId">Span ID:</label>
+      <input type="text" id="spanId" name="spanId" placeholder="Enter Span ID" />
+
+      <label for="commit">Commit:</label>
+      <input type="text" id="commit" name="commit" placeholder="Enter Commit" />
+
+      <label for="parentResourceId">ParentResource Id:</label>
+      <input type="text" id="metadata.parentResourceId" name="parentResourceId" placeholder="Enter Parent ResourceId" />
+
+      <button type="button" onclick="applyFilters()">Apply Filters</button>
+    </form>
+
+    <ul id="resultList"></ul>
+
+    <script>
+      async function ingestData() {
+        const logData = document.getElementById('logData').value
+        console.log('logData', logData)
+        try {
+          const response = await fetch('http://localhost:3000/api/logs', {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json'
+            },
+            body: JSON.stringify(JSON.parse(logData))
+          })
+          const result = await response.json()
+          document.getElementById('successMessage').innerHTML = 'Data ingested successfully!'
+        } catch (error) {
+          console.error('Error during data ingestion:', error)
+          document.getElementById('successMessage').innerHTML = '<div class="error">Error during data ingestion. Please try again.</div>'
+        }
+      }
+
+      async function applyFilters() {
+        const loginAsAdminCheckbox = document.getElementById('loginAsAdmin')
+        const isAdmin = loginAsAdminCheckbox.checked
+
+        if (isAdmin) {
+          await filterLogs()
+        } else {
+          alert('You do not have permission to perform this action. If you are an admin, please check the box to login as admin.')
+        }
+      }
+
+      async function filterLogs() {
+        const level = document.getElementById('level').value
+        const timestamp = document.getElementById('timestamp').value
+        const resourceId = document.getElementById('resourceId').value
+        const message = document.getElementById('message').value
+        const traceId = document.getElementById('traceId').value
+        const spanId = document.getElementById('spanId').value
+        const commit = document.getElementById('commit').value
+        const parentResourceId = document.getElementById('metadata.parentResourceId').value
+
+        const filters = []
+
+        if (level) filters.push(`level=${level}`)
+        if (timestamp) filters.push(`timestamp=${timestamp}`)
+        if (resourceId) filters.push(`resourceId=${resourceId}`)
+        if (message) filters.push(`message=${message}`)
+        if (traceId) filters.push(`traceId=${traceId}`)
+        if (spanId) filters.push(`spanId=${spanId}`)
+        if (commit) filters.push(`commit=${commit}`)
+        if (parentResourceId) filters.push(`parentResourceId=${parentResourceId}`)
+
+        const filterQuery = filters.join('&')
+
+        try {
+          const response = await fetch(`http://localhost:3000/api/search?${filterQuery}`)
+          console.log('response', response)
+          const logs = await response.json()
+
+          displayLogs(logs)
+        } catch (error) {
+          console.error('Error during log search:', error)
+          document.getElementById('resultList').innerHTML = '<li>Error during log search. Please try again.</li>'
+        }
+      }
+
+      function displayLogs(logs) {
+        const resultList = document.getElementById('resultList')
+        resultList.innerHTML = ''
+
+        if (logs.length > 0) {
+          logs.forEach(log => {
+            const listItem = document.createElement('li')
+            listItem.innerHTML = `
+        <strong>Level:</strong> ${log.level} <br>
+        <strong>Message:</strong> ${log.message} <br>
+        <strong>Resource ID:</strong> ${log.resourceId} <br>
+        <strong>Timestamp:</strong> ${log.timestamp} <br>
+        <strong>Trace ID:</strong> ${log.traceId} <br>
+        <strong>Span ID:</strong> ${log.spanId} <br>
+        <strong>Commit:</strong> ${log.commit} <br>
+        <strong>Parent Resource ID:</strong> ${log.metadata.parentResourceId} <br>
+      `
+            resultList.appendChild(listItem)
+          })
+        } else {
+          resultList.innerHTML = '<li>No results found.</li>'
+        }
+      }
+    </script>
+  </body>
+</html>
